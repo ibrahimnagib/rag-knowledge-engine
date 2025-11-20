@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>RAG Knowledge Engine</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 1.5rem;
+      background: #0b0c10;
+      color: #f0f0f0;
+    }
+    h1 {
+      margin-top: 0;
+    }
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    .section {
+      margin-bottom: 1.5rem;
+      padding: 1rem;
+      border-radius: 8px;
+      background: #151820;
+      border: 1px solid #252a36;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-size: 0.9rem;
+      color: #a3a9c2;
+    }
+    select, textarea, input[type="text"], button {
+      font-family: inherit;
+      font-size: 0.95rem;
+    }
+    select, textarea, input[type="text"] {
+      width: 100%;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      border-radius: 6px;
+      border: 1px solid #353b4a;
+      background: #0f1117;
+      color: #f0f0f0;
+    }
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      background: #2563eb;
+      color: #f9fafb;
+      font-weight: 500;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+    .row {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .col {
+      flex: 1;
+      min-width: 260px;
+    }
+    pre {
+      white-space: pre-wrap;
+      background: #0b0d13;
+      padding: 0.75rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      border: 1px solid #252a36;
+    }
+    .tag {
+      display: inline-block;
+      background: #111827;
+      border-radius: 999px;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.75rem;
+      margin: 0 0.35rem 0.35rem 0;
+      border: 1px solid #374151;
+    }
+    .small {
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
+    .docs-list {
+      margin-top: 0.25rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>RAG Knowledge Engine</h1>
+
+    <div class="section">
+      <div class="row">
+        <div class="col">
+          <label for="index-select">Knowledge base</label>
+          <select id="index-select"></select>
+          <div id="index-meta" class="small"></div>
+        </div>
+        <div class="col">
+          <label>Documents in this index</label>
+          <div id="docs-container" class="docs-list small">Loading…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <label for="question-input">Ask a question</label>
+      <textarea id="question-input" placeholder="e.g., What is Taktile used for?"></textarea>
+      <label for="topk-input">Top K chunks</label>
+      <input id="topk-input" type="number" min="1" max="20" value="5" />
+      <button id="ask-btn">Ask</button>
+      <span id="status" class="small"></span>
+    </div>
+
+    <div class="section">
+      <h2>Answer</h2>
+      <pre id="answer-output">No query yet.</pre>
+    </div>
+
+    <div class="section">
+      <h2>Sources</h2>
+      <div id="sources-output" class="small">No sources yet.</div>
+    </div>
+  </div>
+
+  <script>
+    const indexSelect = document.getElementById("index-select");
+    const indexMeta = document.getElementById("index-meta");
+    const docsContainer = document.getElementById("docs-container");
+    const questionInput = document.getElementById("question-input");
+    const topkInput = document.getElementById("topk-input");
+    const askBtn = document.getElementById("ask-btn");
+    const statusEl = document.getElementById("status");
+    const answerOutput = document.getElementById("answer-output");
+    const sourcesOutput = document.getElementById("sources-output");
+
+    async function fetchJSON(path, options = {}) {
+      const res = await fetch(path, {
+        headers: { "Content-Type": "application/json" },
+        ...options,
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text}`);
+      }
+      return res.json();
+    }
+
+    async function loadIndexes() {
+      try {
+        const data = await fetchJSON("/indexes");
+        if (!data.indexes || data.indexes.length === 0) {
+          indexSelect.innerHTML = "<option value=''>No indexes found</option>";
+          indexMeta.textContent = "Ingest some documents first.";
+          docsContainer.textContent = "-";
+          return;
+        }
+        indexSelect.innerHTML = "";
+        data.indexes.forEach((idx) => {
+          const opt = document.createElement("option");
+          opt.value = idx.id;
+          opt.textContent = idx.name || idx.id;
+          indexSelect.appendChild(opt);
+        });
+        updateIndexMeta(data.indexes[0]);
+        await loadDocsForIndex(data.indexes[0].id);
+      } catch (err) {
+        console.error(err);
+        indexSelect.innerHTML = "<option value=''>Error loading indexes</option>";
+        indexMeta.textContent = err.message;
+      }
+    }
+
+    function updateIndexMeta(idx) {
+      const meta = idx.metadata || {};
+      const parts = [];
+      if (meta.display_name) parts.push(`Display: ${meta.display_name}`);
+      if (meta.description) parts.push(`Description: ${meta.description}`);
+      if (Object.keys(meta).length === 0) parts.push("No metadata.");
+      indexMeta.textContent = parts.join(" · ");
+    }
+
+    async function loadDocsForIndex(indexId) {
+      docsContainer.textContent = "Loading…";
+      try {
+        const data = await fetchJSON(`/indexes/${encodeURIComponent(indexId)}/docs`);
+        if (!data.docs || data.docs.length === 0) {
+          docsContainer.textContent = "No documents found in this index.";
+          return;
+        }
+        docsContainer.innerHTML = "";
+        data.docs.forEach((docId) => {
+          const span = document.createElement("span");
+          span.className = "tag";
+          span.textContent = docId;
+          docsContainer.appendChild(span);
+        });
+      } catch (err) {
+        console.error(err);
+        docsContainer.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    indexSelect.addEventListener("change", async () => {
+      const selectedId = indexSelect.value;
+      if (!selectedId) return;
+      // We don’t have the full metadata object here, but that’s okay;
+      // we can leave indexMeta as-is or clear it.
+      await loadDocsForIndex(selectedId);
+    });
+
+    askBtn.addEventListener("click", async () => {
+      const indexId = indexSelect.value;
+      const question = questionInput.value.trim();
+      const topK = parseInt(topkInput.value || "5", 10);
+
+      if (!indexId) {
+        alert("Please select a knowledge base.");
+        return;
+      }
+      if (!question) {
+        alert("Please enter a question.");
+        return;
+      }
+
+      askBtn.disabled = true;
+      statusEl.textContent = "Querying…";
+      answerOutput.textContent = "";
+      sourcesOutput.textContent = "";
+
+      try {
+        const body = {
+          index_name: indexId,
+          question,
+          top_k: topK,
+        };
+        const data = await fetchJSON("/query", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+
+        answerOutput.textContent = data.answer || "(No answer returned.)";
+
+        if (!data.sources || data.sources.length === 0) {
+          sourcesOutput.textContent = "No sources returned.";
+        } else {
+          const container = document.createElement("div");
+          data.sources.forEach((src, idx) => {
+            const block = document.createElement("div");
+            block.style.marginBottom = "0.75rem";
+            block.innerHTML = `
+              <div><strong>Source ${idx + 1}</strong> · doc_id: <code>${src.doc_id}</code> · score: ${src.score.toFixed(3)}</div>
+              <div><pre>${src.snippet}</pre></div>
+            `;
+            container.appendChild(block);
+          });
+          sourcesOutput.innerHTML = "";
+          sourcesOutput.appendChild(container);
+        }
+      } catch (err) {
+        console.error(err);
+        answerOutput.textContent = "";
+        sourcesOutput.textContent = `Error: ${err.message}`;
+      } finally {
+        askBtn.disabled = false;
+        statusEl.textContent = "";
+      }
+    });
+
+    // Initial load
+    loadIndexes();
+  </script>
+</body>
+</html>
