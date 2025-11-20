@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from .models import (
     QueryRequest,
     QueryResponse,
@@ -7,10 +7,11 @@ from .models import (
     DocListResponse,
 )
 from .rag_engine import answer_question
-from .store import list_indexes, list_docs_in_index
+from .store import list_indexes, list_docs_in_index, VectorStore
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pathlib import Path
+from ingest.loaders import simple_chunk_text
 
 
 
@@ -53,3 +54,45 @@ def get_indexes() -> IndexListResponse:
 def get_index_docs(index_name: str) -> DocListResponse:
     docs = list_docs_in_index(index_name)
     return DocListResponse(index_id=index_name, docs=docs)
+
+@app.post("/ingest/upload")
+async def ingest_upload(
+    index_name: str = Form(..., description="Index to ingest into"),
+    file: UploadFile = File(...),
+):
+    """
+    Ingest a single .txt or .md file into the specified index via file upload.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="File must have a filename.")
+
+    suffix = (file.filename.rsplit(".", 1)[-1] or "").lower()
+    if suffix not in {"txt", "md"}:
+        raise HTTPException(status_code=400, detail="Only .txt and .md files are supported.")
+
+    raw_bytes = await file.read()
+    try:
+        text = raw_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="Could not decode file as UTF-8 text.")
+
+    text = text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="File is empty or contains only whitespace.")
+
+    chunks = simple_chunk_text(text, max_chars=800)
+    if not chunks:
+        raise HTTPException(status_code=400, detail="No chunks produced from this file.")
+
+    # doc_id = filename without extension
+    doc_id = file.filename.rsplit(".", 1)[0]
+
+    store = VectorStore(index_name=index_name)
+    store.add_texts(doc_id=doc_id, texts=chunks)
+
+    return {
+        "status": "ok",
+        "index_name": index_name,
+        "doc_id": doc_id,
+        "chunks_ingested": len(chunks),
+    }
