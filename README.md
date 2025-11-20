@@ -1,288 +1,300 @@
-RAG Knowledge Engine
+**RAG Knowledge Engine**
+========================
 
-A lightweight, modular Retrieval-Augmented Generation (RAG) microservice that ingests text documents, stores them as vector embeddings, and answers questions using semantic search + LLM reasoning.
-Built with FastAPI, ChromaDB, and OpenAI embeddings.
+A lightweight, modular **Retrieval-Augmented Generation (RAG) microservice** that ingests text documents, stores them as vector embeddings, and answers questions using semantic search + LLM reasoning.\
+Built with **FastAPI**, **ChromaDB**, and **OpenAI embeddings**, and deployed on **Render**.
+
+**Live Demo:**\
+**<https://rag-knowledge-engine.onrender.com>**
 
 This project demonstrates real-world skills in:
 
-AI systems design
+-   AI systems design
 
-Embedding pipelines & vector search
+-   Vector search architecture
 
-Building scalable decisioning / knowledge infrastructure
+-   Embedding pipelines + text chunking
 
-Modern Python API development
+-   LLM-backed retrieval
 
-LLM-backed retrieval logic
+-   Modern API development with FastAPI
 
-Ingestion, chunking, metadata modeling
+-   Front-end integration for interactive querying
 
-Building an integrated UI for non-technical users
+-   Deployment of AI infra to production
 
-Ideal for demonstrating full-stack AI engineering capability in Forward Deployed Engineering, ML Platform, and Applied AI roles.
+Suitable for roles in Forward Deployed Engineering, AI Platform, ML Infrastructure, Applied AI, and Decisioning Systems.
 
-Features
-✅ Document Ingestion (Local CLI)
+* * * * *
 
-Drop .txt and .md files into any folder
+**Features**
+------------
 
-Run a simple ingestion script to chunk and store them
+### **Document Ingestion (CLI)**
 
-Automatically assigned unique doc_ids
+-   Add `.txt` or `.md` documents to your knowledge base
 
-Stored in ChromaDB persistent collections
+-   Automatic chunking + embedding
 
-✅ Vector Store
+-   Indexes stored in persistent ChromaDB collections
 
-Uses OpenAI embeddings (text-embedding-3-small)
+### **Vector Database**
 
-Uses ChromaDB persistent vector database
+-   Uses **ChromaDB** for high-performance vector search
 
-Supports multiple indexes (Knowledge Bases)
+-   Each index is a separate collection (knowledge base)
 
-✅ RAG Query API
+-   Metadata support for doc IDs, display names, etc.
 
-/query endpoint takes:
+### **RAG Pipeline**
 
-index_name
+-   Query any knowledge base using semantic search
 
-question
+-   Retrieves most relevant chunks (top_k)
 
-top_k
+-   Constructs grounded context
 
-Performs semantic search
+-   Calls an LLM for an accurate, source-grounded answer
 
-Constructs a context block
+-   Returns chunks + scores for transparency
 
-Calls an LLM for grounded reasoning
+### **Interactive UI (No Framework Required)**
 
-Returns:
+Available at the root URL:
 
-The answer
+**<https://rag-knowledge-engine.onrender.com>**
 
-The exact source chunks
+Includes:
 
-Scores + metadata
+-   Knowledge base selector
 
-✅ Human-Friendly Knowledge Base Discovery
+-   Document listing
 
-GET /indexes → lists available knowledge bases
+-   RAG query box
 
-GET /indexes/{index}/docs → lists document IDs
+-   Answer viewer
 
-Enables UI dropdowns and self-discovery without knowing index names
+-   Source viewer with doc IDs + similarity scores
 
-✅ Mini Web UI (HTML/JS)
+### **REST API Endpoints**
 
-Select knowledge base
+`GET  /health                        → health check
+GET  /indexes                       → list knowledge bases
+GET  /indexes/{index}/docs          → list docs in an index
+POST /query                         → run RAG query`
 
-View docs in that index
+* * * * *
 
-Ask questions and view:
+**Project Structure**
+---------------------
 
-Answer
-
-Retrieved chunks
-
-Scores
-
-All client-side, no framework required
-
-⚙️ Tech Stack
-
-Python 3.11
-
-FastAPI
-
-Uvicorn
-
-ChromaDB
-
-OpenAI API
-
-HTML + JavaScript UI
-
-Project Structure
-rag-knowledge-engine/
+`rag-knowledge-engine/
 │
 ├── app/
 │   ├── main.py           # FastAPI app + routes
 │   ├── store.py          # VectorStore + index/doc helpers
-│   ├── embeddings.py     # OpenAI embeddings
-│   ├── rag_engine.py     # RAG reasoning pipeline
-│   └── models.py         # Pydantic models
+│   ├── embeddings.py     # OpenAI embedding logic
+│   ├── rag_engine.py     # Retrieval-augmented generation pipeline
+│   └── models.py         # Pydantic models for requests/responses
 │
 ├── ingest/
-│   ├── loaders.py        # Load + chunk document files
-│   └── ingest_cli.py     # CLI for directory ingestion
+│   ├── loaders.py        # Load + chunk .txt and .md files
+│   └── ingest_cli.py     # CLI tool for ingestion
 │
 ├── static/
-│   └── index.html        # Mini UI for querying knowledge bases
+│   └── index.html        # Browser UI for interactive querying
 │
 ├── data/
-│   └── indexes/          # ChromaDB persistent collections
+│   └── indexes/          # Chroma persistent DB (ignored in Git)
 │
 ├── requirements.txt
+├── runtime.txt
 ├── README.md
-└── .gitignore
+└── .gitignore`
 
-How It Works
-1. Embeddings
+* * * * *
 
-Documents are split into chunks (~800 chars) and embedded with:
+**How It Works**
+================
 
-text-embedding-3-small
+### **1\. Chunking + Embeddings**
 
+-   Documents split into ~800-character chunks
 
-Each chunk becomes a high-dimensional vector representing semantic meaning.
+-   Embedded using `text-embedding-3-small`
 
-2. Vector Store
+-   Stored with metadata: `doc_id`, text, vector
 
-Vectors + metadata are stored in ChromaDB:
+### **2\. Vector Search**
 
-doc_id
+-   All chunks stored in ChromaDB collection
 
-chunk text
+-   Query embedding compared to stored vectors
 
-collection name = knowledge base
+-   Top-K chunks returned by cosine similarity
 
-Collections persist to data/indexes/.
+### **3\. RAG Answering**
 
-3. RAG Query Pipeline
+Pipeline:
 
-A query triggers:
+1.  Embed user query
 
-Embed question
+2.  Retrieve chunks
 
-Similarity search (top_k)
+3.  Construct contextual prompt
 
-Format chunks as context
+4.  Call LLM (e.g., GPT-4o-mini)
 
-Feed context + question into an LLM
+5.  Return grounded answer + sources
 
-Return grounded answer + source chunks
+No hallucinations --- answers are limited to retrieved context.
 
-No hallucinations. No ungrounded answers.
+* * * * *
 
-Local Setup
-1. Clone and enter the project
-git clone https://github.com/<your-username>/rag-knowledge-engine.git
-cd rag-knowledge-engine
+**Local Setup**
+===============
 
-2. Create and activate virtual environment
-python3 -m venv venv
-source venv/bin/activate
+### Clone and enter the project
 
-3. Install dependencies
-pip install -r requirements.txt
+`git clone https://github.com/<your-username>/rag-knowledge-engine.git
+cd rag-knowledge-engine`
 
-4. Add your OpenAI key
+### Create virtual environment
 
-Create a .env file:
+`python3 -m venv venv
+source venv/bin/activate`
 
-OPENAI_API_KEY=your_key_here
+### Install dependencies
 
-Running the API
-Start FastAPI server
-uvicorn app.main:app --reload
+`pip install -r requirements.txt`
 
-Open the UI
+### Add environment variable
 
-Your project includes a built-in UI.
+Create `.env`:
+
+`OPENAI_API_KEY=your_openai_key`
+
+* * * * *
+
+**Running Locally**
+===================
+
+Start the API:
+
+`uvicorn app.main:app --reload`
 
 Open:
 
-http://127.0.0.1:8000/
+-   UI:\
+    **http://127.0.0.1:8000/**
 
-API docs:
+-   API docs:\
+    **http://127.0.0.1:8000/docs**
 
-FastAPI auto-docs are at:
+* * * * *
 
-http://127.0.0.1:8000/docs
+**Ingesting Documents**
+=======================
 
-Ingesting Documents
+Add `.txt` or `.md` files:
 
-To ingest local .txt or .md files:
+`mkdir -p data/raw/job_prep`
 
-1. Create a folder:
-mkdir -p data/raw/my_notes
+Drop your files into that folder.
 
-2. Add .txt or .md files inside it
-3. Run ingestion CLI:
-python -m ingest.ingest_cli --index my_notes --path data/raw/my_notes
+Run ingestion:
 
+`python -m ingest.ingest_cli --index job_prep --path data/raw/job_prep`
 
 This will:
 
-Load files
+-   Load the files
 
-Chunk text
+-   Chunk them
 
-Embed chunks
+-   Embed chunks
 
-Store them in ChromaDB
+-   Store them in the `job_prep` knowledge base
 
-Create the index if it doesn't exist
+* * * * *
 
-Query Example
-POST /query
-{
-  "index_name": "my_notes",
+**Query Example**
+=================
+
+POST `/query`:
+
+`{
+  "index_name": "job_prep",
   "question": "What does Taktile do?",
   "top_k": 3
-}
+}`
 
+Response:
 
-Returns:
+-   `answer` --- LLM-generated summary grounded in sources
 
-answer
+-   `sources` --- list of chunks, doc_ids, and similarity scores
 
-sources with doc_ids, scores, and chunk text
+* * * * *
 
-Why This Project Matters
+**Deployment**
+==============
 
-This project demonstrates an understanding of:
+### Hosted on Render:
 
-Retrieval-Augmented Generation
+**<https://rag-knowledge-engine.onrender.com>**
 
-Vector databases
+Render config:
 
-Document chunking strategies
+-   **Build Command:**\
+    `pip install -r requirements.txt`
 
-LLM reasoning grounded in retrieval
+-   **Start Command:**\
+    `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
-API design and data models
+-   **Environment Vars:**\
+    `OPENAI_API_KEY=your_key_here`
 
-Production-friendly Python structure
+* * * * *
 
-Full-stack thinking (UI + backend + ingestion)
+**Roadmap**
+===========
 
-This is exactly the type of work done by:
+-   File-upload ingestion from UI
 
-Forward Deployed Engineers
+-   Multi-index search
 
-AI Platform Engineers
+-   Chat-style interface
 
-ML Engineers
+-   PDF ingestion
 
-Applied AI / Infra engineers
+-   Middleware for per-index authorization
 
-Decisioning platform implementers
+-   Docker support
 
-It’s also extensible into:
+-   Usage logging + analytics dashboard
 
-Multi-index search
+* * * * *
 
-Authentication
+**Why This Project Matters**
+============================
 
-Ingestion via UI
+This codebase shows practical experience with:
 
-Agentic querying
+-   Retrieval-Augmented Generation
 
-Model switching
+-   Vector databases
 
-Document viewers
+-   LLM inference pipelines
 
-PDF ingestion
+-   Backend API design
 
-Full UX dashboard
+-   Semantic search
+
+-   Embedding modeling
+
+-   Front-end + backend integration
+
+-   Cloud deployment of AI systems
+
+These are core patterns in modern AI engineering and decisioning platforms.
